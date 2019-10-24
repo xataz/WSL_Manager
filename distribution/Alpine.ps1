@@ -16,15 +16,52 @@ Alpine Linux was designed with security in mind. All userland binaries are compi
 "@
 
 
+$labelUsername                   = New-Object system.Windows.Forms.Label
+$labelUsername.text              = "Username :"
+$labelUsername.AutoSize          = $true
+$labelUsername.width             = 25
+$labelUsername.height            = 10
+$labelUsername.location          = New-Object System.Drawing.Point(26,33)
+$labelUsername.Font              = 'Microsoft Sans Serif,10'
 
-$Column2 = New-Object System.Windows.Forms.DataGridViewComboBoxCell
+$textboxUsername                 = New-Object system.Windows.Forms.TextBox
+$textboxUsername.multiline       = $false
+$textboxUsername.width           = 100
+$textboxUsername.height          = 20
+$textboxUsername.location        = New-Object System.Drawing.Point(117,30)
+$textboxUsername.Font            = 'Microsoft Sans Serif,10'
 
-$Column2.Items.AddRange($versions)
-#$Parameters.Rows.Add($Column1, $Column2)
+$labelPassword                   = New-Object system.Windows.Forms.Label
+$labelPassword.text              = "Password :"
+$labelPassword.AutoSize          = $true
+$labelPassword.width             = 25
+$labelPassword.height            = 10
+$labelPassword.location          = New-Object System.Drawing.Point(309,33)
+$labelPassword.Font              = 'Microsoft Sans Serif,10'
 
-$Parameters.Rows.Insert(0, "Version", [System.Windows.Forms.DataGridViewComboBoxCell]$Column2)
-#$Parameters.Rows.AddRange($Column1, $Column2)
-#$Column1.ReadOnly = $True
+$textboxPassword                 = New-Object system.Windows.Forms.TextBox
+$textboxPassword.multiline       = $false
+$textboxPassword.width           = 100
+$textboxPassword.height          = 20
+$textboxPassword.location        = New-Object System.Drawing.Point(440,30)
+$textboxPassword.Font            = 'Microsoft Sans Serif,10'
+
+$labelPasswordRetype             = New-Object system.Windows.Forms.Label
+$labelPasswordRetype.text        = "Retype Password :"
+$labelPasswordRetype.AutoSize    = $true
+$labelPasswordRetype.width       = 25
+$labelPasswordRetype.height      = 10
+$labelPasswordRetype.location    = New-Object System.Drawing.Point(309,67)
+$labelPasswordRetype.Font        = 'Microsoft Sans Serif,10'
+
+$textboxPasswordRetype           = New-Object system.Windows.Forms.TextBox
+$textboxPasswordRetype.multiline  = $false
+$textboxPasswordRetype.width     = 100
+$textboxPasswordRetype.height    = 20
+$textboxPasswordRetype.location  = New-Object System.Drawing.Point(440,64)
+$textboxPasswordRetype.Font      = 'Microsoft Sans Serif,10'
+
+    $group.controls.AddRange(@($labelUsername,$textboxUsername,$labelPassword,$textboxPassword,$labelPasswordRetype,$textboxPasswordRetype))
 
 function prepare($version) {
     $version_short = $version.split(".")[0]+"."+$version.split(".")[1]
@@ -53,4 +90,13 @@ function clean($name) {
     wsl.exe --distribution $name --exec apk del openssl shadow
     write-output "Removing temp file`n"
     Remove-Item $env:TMP\alpine.tar.gz
+}
+
+
+function setup() {
+    $name = $textboxName.Text
+    $version = $comboboxVersion.SelectedItem
+    $username = $textboxUsername.Text
+
+    write-host $name $version $username
 }
