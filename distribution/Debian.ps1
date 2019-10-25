@@ -1,4 +1,4 @@
-$versions = "jessie", "stretch", "buster", "testing", "sid"
+$versions = @("jessie", "stretch", "buster", "testing", "sid")
 $logo = "logo\debian.png"
 $summary = @"
 The Debian Project is an association of individuals who have made common cause to create a free operating system. This operating system that we have created is called Debian.

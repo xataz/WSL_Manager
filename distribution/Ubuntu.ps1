@@ -1,4 +1,4 @@
-﻿$versions = "xenial", "bionic", "disco", "eoan"
+﻿$versions = @("xenial", "bionic", "disco", "eoan")
 $logo = "logo\ubuntu.png"
 $summary = @"
 Ubuntu is an open-source operating system (OS) based on the Debian GNU/Linux distribution.

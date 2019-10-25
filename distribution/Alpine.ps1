@@ -1,4 +1,4 @@
-$versions = "3.10.3","3.9.4","3.8.4"
+$versions = @("3.10.3","3.9.4","3.8.4")
 $logo = "logo\alpine.png"
 $summary = @"
 Alpine Linux is an independent, non-commercial, general purpose Linux distribution designed for power users who appreciate security, simplicity and resource efficiency.
@@ -16,53 +16,6 @@ Alpine Linux was designed with security in mind. All userland binaries are compi
 "@
 
 
-$labelUsername                   = New-Object system.Windows.Forms.Label
-$labelUsername.text              = "Username :"
-$labelUsername.AutoSize          = $true
-$labelUsername.width             = 25
-$labelUsername.height            = 10
-$labelUsername.location          = New-Object System.Drawing.Point(26,33)
-$labelUsername.Font              = 'Microsoft Sans Serif,10'
-
-$textboxUsername                 = New-Object system.Windows.Forms.TextBox
-$textboxUsername.multiline       = $false
-$textboxUsername.width           = 100
-$textboxUsername.height          = 20
-$textboxUsername.location        = New-Object System.Drawing.Point(117,30)
-$textboxUsername.Font            = 'Microsoft Sans Serif,10'
-
-$labelPassword                   = New-Object system.Windows.Forms.Label
-$labelPassword.text              = "Password :"
-$labelPassword.AutoSize          = $true
-$labelPassword.width             = 25
-$labelPassword.height            = 10
-$labelPassword.location          = New-Object System.Drawing.Point(309,33)
-$labelPassword.Font              = 'Microsoft Sans Serif,10'
-
-$textboxPassword                 = New-Object system.Windows.Forms.TextBox
-$textboxPassword.multiline       = $false
-$textboxPassword.width           = 100
-$textboxPassword.height          = 20
-$textboxPassword.location        = New-Object System.Drawing.Point(440,30)
-$textboxPassword.Font            = 'Microsoft Sans Serif,10'
-
-$labelPasswordRetype             = New-Object system.Windows.Forms.Label
-$labelPasswordRetype.text        = "Retype Password :"
-$labelPasswordRetype.AutoSize    = $true
-$labelPasswordRetype.width       = 25
-$labelPasswordRetype.height      = 10
-$labelPasswordRetype.location    = New-Object System.Drawing.Point(309,67)
-$labelPasswordRetype.Font        = 'Microsoft Sans Serif,10'
-
-$textboxPasswordRetype           = New-Object system.Windows.Forms.TextBox
-$textboxPasswordRetype.multiline  = $false
-$textboxPasswordRetype.width     = 100
-$textboxPasswordRetype.height    = 20
-$textboxPasswordRetype.location  = New-Object System.Drawing.Point(440,64)
-$textboxPasswordRetype.Font      = 'Microsoft Sans Serif,10'
-
-    $group.controls.AddRange(@($labelUsername,$textboxUsername,$labelPassword,$textboxPassword,$labelPasswordRetype,$textboxPasswordRetype))
-
 function prepare($version) {
     $version_short = $version.split(".")[0]+"."+$version.split(".")[1]
     $url_alpine="http://dl-cdn.alpinelinux.org/alpine/v$version_short/releases/x86_64/alpine-minirootfs-$version-x86_64.tar.gz"
@@ -71,7 +24,7 @@ function prepare($version) {
     Invoke-WebRequest $url_alpine -OutFile $env:TMP\alpine.tar.gz
 }
 
-function install($name, $location, $username, $passwd) {
+function install($name, $username, $passwd) {
     write-output "Creating $name`n"
     wsl.exe --import $name $location\$name $env:TMP\alpine.tar.gz
     write-output "Upgrading $name`n"
@@ -93,10 +46,6 @@ function clean($name) {
 }
 
 
-function setup() {
-    $name = $textboxName.Text
-    $version = $comboboxVersion.SelectedItem
-    $username = $textboxUsername.Text
+function setup($name, $username, $password, $location) {
 
-    write-host $name $version $username
 }

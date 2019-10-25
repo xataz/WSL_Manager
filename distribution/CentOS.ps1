@@ -1,4 +1,4 @@
-$versions = "6","7","8"
+$versions = @("6","7","8")
 $logo = "logo\centos.png"
 $summary = @"
 The CentOS Project is a community-driven free software effort focused on delivering a robust open source ecosystem around a Linux platform.
