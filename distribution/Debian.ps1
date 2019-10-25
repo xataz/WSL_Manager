@@ -29,7 +29,7 @@ function prepare($version) {
     wsl.exe --distribution TempAlpine tar czf $tmpwsl/debian.tar.gz -C /mnt/debian .
 }
 
-function install($name, $location, $username, $passwd) {
+function install($name, $username, $passwd) {
     write-output "Creating $name"
     wsl.exe --import $name $location\$name $env:TMP\debian.tar.gz
     write-output "Upgrading $name"
@@ -50,4 +50,10 @@ function clean($name) {
     write-output "Removing temp file"
     Remove-Item $env:TMP\tmp.tar.gz
     Remove-Item $env:TMP\debian.tar.gz
+}
+
+function setup($name, $version, $username, $password, $location) {
+    prepare $version
+    install $name $username $password
+    clean $name
 }

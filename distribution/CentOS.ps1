@@ -34,9 +34,9 @@ function prepare($version) {
     wsl.exe --distribution TempAlpine tar czf $tmpwsl/centos.tar.gz -C /mnt/centos .
 }
 
-function install($name, $location, $username, $passwd) {
+function install($name, $username, $passwd) {
     write-output "Creating $name"
-    wsl.exe --import $name $location\$name $env:TMP\centos.tar.gz | out-host
+    wsl.exe --import $name $location\$name $env:TMP\centos.tar.gz
     write-output "Upgrading $name"
     wsl.exe --distribution $name yum update -y
     write-output "Installing shadow and openssl"
@@ -56,4 +56,10 @@ function clean($name) {
     Remove-Item $env:TMP\tmp.tar.gz
     Remove-Item $env:TMP\centos.tar.gz
     Remove-Item $env:TMP\centos.tar.xz
+}
+
+function setup($name, $version, $username, $password, $location) {
+    prepare $version
+    install $name $username $password
+    clean $name
 }

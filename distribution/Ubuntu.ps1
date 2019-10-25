@@ -44,3 +44,9 @@ function clean($name) {
     Remove-Item $env:TMP\tmp.tar.gz
     Remove-Item $env:TMP\ubuntu.tar.gz
 }
+
+function setup($name, $version, $username, $password, $location) {
+    prepare $version
+    install $name $username $password
+    clean $name
+}

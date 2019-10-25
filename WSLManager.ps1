@@ -104,6 +104,90 @@ $aboutForm.ShowDialog()
 
 }
 
+
+
+## Main FORM
+$main_form                       = New-Object system.Windows.Forms.Form
+$main_form.ClientSize            = '725,600'
+$main_form.text                  = "WSL Manager"
+$main_form.BackColor             = "#575555"
+$main_form.TopMost               = $false
+
+$List_WSL                        = New-Object system.Windows.Forms.ListView
+$List_WSL.text                   = "List_WSL"
+$List_WSL.width                  = 325
+$List_WSL.height                 = 250
+$List_WSL.Margin                 = 0
+$List_WSL.Anchor                 = 'top,right,bottom,left'
+$List_WSL.BackColor              = "#575555"
+$List_WSL.location               = New-Object System.Drawing.Point(0,25)
+$List_WSL.View                   = "Details"
+
+$groupDistri                     = New-Object system.Windows.Forms.Groupbox
+$groupDistri.height              = 200
+$groupDistri.width               = 400
+$groupDistri.BackColor           = "#575555"
+$groupDistri.Anchor              = 'top,right,bottom'
+$groupDistri.text                = "Parameters"
+$groupDistri.location            = New-Object System.Drawing.Point(15,320)
+
+$menuMain                        = New-Object System.Windows.Forms.MenuStrip
+$menuMain.Margin                 = 0
+
+$submenuInstallSrc               = New-Object System.Windows.Forms.ToolStripMenuItem
+$submenuInstallSrc.Text          = "Install from source"
+
+$submenuInstallDocker            = New-Object System.Windows.Forms.ToolStripMenuItem
+$submenuInstallDocker.Text       = "Install from docker"
+
+$submenuSettings                 = New-Object System.Windows.Forms.ToolStripMenuItem
+$submenuSettings.Text            = "Settings"
+
+$submenuExit                     = New-Object System.Windows.Forms.ToolStripMenuItem
+$submenuExit.Text                = "Exit"
+
+$menuTools                       = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuTools.Text                  = "Tools"
+
+$menuHelp                        = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuHelp.Text                   = "?"
+
+$submenuAbout                    = New-Object System.Windows.Forms.ToolStripMenuItem
+$submenuAbout.Text               = "About"
+
+$main_form.controls.AddRange(@($List_WSL,$menuMain))
+$menuMain.Items.AddRange(@($menuTools,$menuHelp))
+$menuTools.DropDownItems.AddRange(@($submenuInstallSrc,$submenuInstallDocker,$submenuSettings,$submenuExit))
+$menuHelp.DropDownItems.AddRange(@($submenuAbout))
+
+## Console FORM
+$consoleForm                     = New-Object system.Windows.Forms.Form
+$consoleForm.ClientSize          = '750,400'
+$consoleForm.text                = "WSL Manager - Console"
+$consoleForm.TopMost             = $false
+$consoleForm.BackColor             = "#575555"
+
+$textboxConsole                  = New-Object system.Windows.Forms.TextBox
+$textboxConsole.multiline        = $true
+$textboxConsole.ReadOnly         = $true
+$textboxConsole.Scrollbars       = 'Vertical'
+$textboxConsole.width            = 725
+$textboxConsole.height           = 330
+$textboxConsole.Anchor           = 'top,right,bottom,left'
+$textboxConsole.location         = New-Object System.Drawing.Point(12,15)
+$textboxConsole.Font             = 'Microsoft Sans Serif,10'
+
+$buttonDone                      = New-Object system.Windows.Forms.Button
+$buttonDone.text                 = "Done"
+$buttonDone.width                = 60
+$buttonDone.height               = 30
+$buttonDone.location             = New-Object System.Drawing.Point(666,359)
+$buttonDone.Font                 = 'Microsoft Sans Serif,10'
+$buttonDone.Enabled              = $False
+
+$consoleForm.controls.AddRange(@($textboxConsole,$buttonDone))
+
+
 function settings_form() {
     $settingsForm                    = New-Object system.Windows.Forms.Form
     $settingsForm.ClientSize         = '400,400'
@@ -157,7 +241,12 @@ function settings_form() {
 
     $settingsForm.controls.AddRange(@($labelPathWSL,$labelWSLVersion,$buttonCancel,$buttonSave,$textboxPathWSL,$comboboxWSLVersion))
 
-    $comboboxWSLVersion.items.AddRange(@("1","2"))
+    if ( [int](Get-WmiObject Win32_OperatingSystem).BuildNumber -le 18917) {
+        $comboboxWSLVersion.items.Add("1")
+    } else {
+        $comboboxWSLVersion.items.AddRange(@("1","2"))
+    }
+    
     if ($Parameters.parameters.WSL.DefaultVersion -eq "1") {
         $comboboxWSLVersion.SelectedIndex = 0
     } elseif ($Parameters.parameters.WSL.DefaultVersion -eq "2") {
@@ -348,8 +437,8 @@ function InstallFromSrc_form() {
     })
 
     $button_InstallSrc.Add_Click({
-        $name = $textboxName
-        $version = $comboboxVersion.SelectedItems.text
+        $name = $textboxName.Text
+        $version = $comboboxVersion.SelectedItem
         $location = $Parameters.parameters.WSL.Location
         $username = $textboxUsername.Text
         $password = $textboxPassword.Text
@@ -359,7 +448,20 @@ function InstallFromSrc_form() {
             $distribution = $ListDistrib.SelectedItems.text
             . "distribution\$distribution.ps1"
 
-            setup $name $version $username $password $location
+            $consoleForm.Add_Shown({
+                #$consoleForm.Activate()
+                $buttonDone.Enabled = $False
+                $textboxConsole.Clear()
+                setup $name $version $username $password $location | foreach {
+                    $textboxConsole.AppendText("$_`r`n")
+                }
+                $buttonDone.Enabled = $True
+                
+            })
+            
+            $consoleForm.ShowDialog()
+            
+            
 
             if (Get-Variable versions) {
                 Remove-Variable versions
@@ -372,67 +474,71 @@ function InstallFromSrc_form() {
         }
     })
 
+    $InstallFromSrc_form.Add_Closed({
+        $List_WSL.Clear()
+        $List_WSL.Columns.Add("Name")
+        $List_WSL.Columns.Add("Status")
+        $List_WSL.Columns.Add("WSL Version")
+    
+
+        $ListDistri = (wsl --list --verbose) | select -Skip 1 | foreach {
+            if ($_.Length -ne 1) {
+                $distriName = ""
+                [int[]][char[]]$_ | foreach {
+                    if ( $_ -ne 0 ) {
+                        $distriName += [char]$_
+                    }
+                }
+                $distriName
+            } 
+        } | ConvertFrom-String
+
+        foreach ($distri in $ListDistri) {
+            $itemname = New-Object System.Windows.Forms.ListViewItem($distri.p2)
+            $itemname.SubItems.Add($distri.p3)
+            $itemname.SubItems.Add($distri.p4)
+            $List_WSL.Items.Add($itemname)
+            $List_WSL.AutoResizeColumns(2)
+        }
+    })
+   
     $InstallFromSrc_form.ShowDialog()
 
 }
 
-## Main FORM
-$main_form                       = New-Object system.Windows.Forms.Form
-$main_form.ClientSize            = '725,600'
-$main_form.text                  = "WSL Manager"
-$main_form.BackColor             = "#575555"
-$main_form.TopMost               = $false
-
-$List_WSL                        = New-Object system.Windows.Forms.ListView
-$List_WSL.text                   = "List_WSL"
-$List_WSL.width                  = 725
-$List_WSL.height                 = 575
-$List_WSL.Margin                 = 0
-$List_WSL.Anchor                 = 'top,right,bottom,left'
-$List_WSL.BackColor              = "#575555"
-$List_WSL.location               = New-Object System.Drawing.Point(0,25)
-$List_WSL.View = "Details"
-
-$menuMain                        = New-Object System.Windows.Forms.MenuStrip
-$menuMain.Margin                 = 0
-
-$submenuInstallSrc               = New-Object System.Windows.Forms.ToolStripMenuItem
-$submenuInstallSrc.Text          = "Install from source"
-
-$submenuInstallDocker            = New-Object System.Windows.Forms.ToolStripMenuItem
-$submenuInstallDocker.Text       = "Install from docker"
-
-$submenuSettings                 = New-Object System.Windows.Forms.ToolStripMenuItem
-$submenuSettings.Text            = "Settings"
-
-$submenuExit                     = New-Object System.Windows.Forms.ToolStripMenuItem
-$submenuExit.Text                = "Exit"
-
-$menuTools                       = New-Object System.Windows.Forms.ToolStripMenuItem
-$menuTools.Text                  = "Tools"
-
-$menuHelp                        = New-Object System.Windows.Forms.ToolStripMenuItem
-$menuHelp.Text                   = "?"
-
-$submenuAbout                    = New-Object System.Windows.Forms.ToolStripMenuItem
-$submenuAbout.Text               = "About"
-
-$main_form.controls.AddRange(@($List_WSL,$menuMain))
-$menuMain.Items.AddRange(@($menuTools,$menuHelp))
-$menuTools.DropDownItems.AddRange(@($submenuInstallSrc,$submenuInstallDocker,$submenuSettings,$submenuExit))
-$menuHelp.DropDownItems.AddRange(@($submenuAbout))
-
-$List_WSL.Add_DoubleClick({ write-host "Click $List_WSL.SelectedSubItem" })
+$List_WSL.Add_DoubleClick({ 
+    $Distri = $List_WSL.SelectedItems.Text
+    write-host "Click $Distri" 
+})
 
 $main_form.Add_Shown({ 
     $List_WSL.Columns.Add("Name")
-    $List_WSL.Columns.Add("Distribution")
-        
-    $itemname = New-Object System.Windows.Forms.ListViewItem("Debian")
-    $itemname.SubItems.Add("Debian 10 (buster)")
-    $List_WSL.Items.Add($itemname)
-    $List_WSL.AutoResizeColumns(2)
+    $List_WSL.Columns.Add("Status")
+    $List_WSL.Columns.Add("WSL Version")
+    
+
+    $ListDistri = (wsl --list --verbose) | select -Skip 1 | foreach {
+        if ($_.Length -ne 1) {
+            $distriName = ""
+            [int[]][char[]]$_ | foreach {
+                if ( $_ -ne 0 ) {
+                    $distriName += [char]$_
+                }
+            }
+            $distriName
+        } 
+    } | ConvertFrom-String
+
+    foreach ($distri in $ListDistri) {
+        $itemname = New-Object System.Windows.Forms.ListViewItem($distri.p2)
+        $itemname.SubItems.Add($distri.p3)
+        $itemname.SubItems.Add($distri.p4)
+        $List_WSL.Items.Add($itemname)
+        $List_WSL.AutoResizeColumns(2)
+    }
+
 })
+
 
 
 
@@ -452,6 +558,11 @@ $submenuSettings.Add_Click({
 
 $submenuAbout.Add_Click({
     about_form
+})
+
+$buttonDone.Add_Click({
+    $textboxConsole.Clear()
+    $consoleForm.Close()
 })
 
 #Write your logic code here
