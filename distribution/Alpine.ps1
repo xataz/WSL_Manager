@@ -46,6 +46,8 @@ function clean($name) {
 }
 
 
-function setup($name, $username, $password, $location) {
-
+function setup($name, $version, $username, $password, $location) {
+    prepare $version
+    install $name $username $password
+    clean $name
 }

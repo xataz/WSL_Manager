@@ -349,6 +349,7 @@ function InstallFromSrc_form() {
 
     $button_InstallSrc.Add_Click({
         $name = $textboxName
+        $version = $comboboxVersion.SelectedItems.text
         $location = $Parameters.parameters.WSL.Location
         $username = $textboxUsername.Text
         $password = $textboxPassword.Text
@@ -358,7 +359,7 @@ function InstallFromSrc_form() {
             $distribution = $ListDistrib.SelectedItems.text
             . "distribution\$distribution.ps1"
 
-            setup $name $username $password $location
+            setup $name $version $username $password $location
 
             if (Get-Variable versions) {
                 Remove-Variable versions
