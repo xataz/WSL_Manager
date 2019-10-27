@@ -28,6 +28,18 @@ if (!(Test-Path $ParametersFile)) {
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
+
+function Hide_Powershell_Console {
+    Add-Type -Name Window -Namespace Console -MemberDefinition '
+    [DllImport("Kernel32.dll")]
+    public static extern IntPtr GetConsoleWindow();
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, Int32 nCmdShow);
+    '
+    $consolePtr = [Console.Window]::GetConsoleWindow()
+    [Console.Window]::ShowWindow($consolePtr, 0)
+}
+
 function error_form($error) {
     $errorForm = New-Object System.Windows.Forms.Form
     $errorForm.Text = "Error !"
@@ -187,6 +199,33 @@ $buttonDone.Enabled              = $False
 
 $consoleForm.controls.AddRange(@($textboxConsole,$buttonDone))
 
+function refresh_List($List_WSL) {
+    $List_WSL.Clear()
+    $List_WSL.Columns.Add("Name")
+    $List_WSL.Columns.Add("Status")
+    $List_WSL.Columns.Add("WSL Version")
+    
+
+    $ListDistri = (wsl --list --verbose) | select -Skip 1 | foreach {
+        if ($_.Length -ne 1) {
+            $distriName = ""
+            [int[]][char[]]$_ | foreach {
+                if ( $_ -ne 0 ) {
+                    $distriName += [char]$_
+                }
+            }
+            $distriName
+        } 
+    } | ConvertFrom-String
+
+    foreach ($distri in $ListDistri) {
+        $itemname = New-Object System.Windows.Forms.ListViewItem($distri.p2)
+        $itemname.SubItems.Add($distri.p3)
+        $itemname.SubItems.Add($distri.p4)
+        $List_WSL.Items.Add($itemname)
+        $List_WSL.AutoResizeColumns(2)
+    }
+}
 
 function settings_form() {
     $settingsForm                    = New-Object system.Windows.Forms.Form
@@ -267,248 +306,240 @@ function settings_form() {
     $settingsForm.ShowDialog()
 }
 
-## InstallFromSrc FORM
-function InstallFromSrc_form() {
-    $InstallFromSrc_form             = New-Object system.Windows.Forms.Form
-    $InstallFromSrc_form.ClientSize  = '725,600'
-    $InstallFromSrc_form.text        = "WSL Manager - Install From Sources"
-    $InstallFromSrc_form.BackColor   = "#575555"
-    $InstallFromSrc_form.TopMost     = $false
 
-    $groupDescription                = New-Object system.Windows.Forms.Groupbox
-    $groupDescription.height         = 575
-    $groupDescription.width          = 290
-    $groupDescription.BackColor      = "#575555"
-    $groupDescription.Anchor         = 'top,right,bottom'
-    $groupDescription.text           = "Description"
-    $groupDescription.location       = New-Object System.Drawing.Point(428,10)
 
-    $IconDistribution                = New-Object system.Windows.Forms.PictureBox
-    $IconDistribution.width          = 166
-    $IconDistribution.height         = 144
-    $IconDistribution.location       = New-Object System.Drawing.Point(65,21)
-    $IconDistribution.imageLocation  = ""
-    $IconDistribution.SizeMode       = [System.Windows.Forms.PictureBoxSizeMode]::zoom
+$InstallFromSrc_form             = New-Object system.Windows.Forms.Form
+$InstallFromSrc_form.ClientSize  = '725,600'
+$InstallFromSrc_form.text        = "WSL Manager - Install From Sources"
+$InstallFromSrc_form.BackColor   = "#575555"
+$InstallFromSrc_form.TopMost     = $false
 
-    $DescribeText                    = New-Object system.Windows.Forms.TextBox
-    $DescribeText.multiline          = $true
-    $DescribeText.enabled            = $true
-    $DescribeText.ReadOnly           = $true
-    $DescribeText.width              = 256
-    $DescribeText.height             = 382
-    $DescribeText.anchor             = 'top,left,bottom,right'
-    $DescribeText.location           = New-Object System.Drawing.Point(20,184)
-    $DescribeText.Font               = 'Microsoft Sans Serif,10'
-    $DescribeText.Scrollbars         = "Vertical" 
+$groupDescription                = New-Object system.Windows.Forms.Groupbox
+$groupDescription.height         = 575
+$groupDescription.width          = 290
+$groupDescription.BackColor      = "#575555"
+$groupDescription.Anchor         = 'top,right,bottom'
+$groupDescription.text           = "Description"
+$groupDescription.location       = New-Object System.Drawing.Point(428,10)
 
-    $ListDistrib                     = New-Object system.Windows.Forms.ListView
-    $ListDistrib.text                = "listView"
-    $ListDistrib.BackColor           = "#575555"
-    $ListDistrib.anchor              = 'top,right,left'
-    $ListDistrib.width               = 400
-    $ListDistrib.height              = 300
-    $ListDistrib.location            = New-Object System.Drawing.Point(15,10)
-    $ListDistrib.View                = "Details"
+$IconDistribution                = New-Object system.Windows.Forms.PictureBox
+$IconDistribution.width          = 166
+$IconDistribution.height         = 144
+$IconDistribution.location       = New-Object System.Drawing.Point(65,21)
+$IconDistribution.imageLocation  = ""
+$IconDistribution.SizeMode       = [System.Windows.Forms.PictureBoxSizeMode]::zoom
 
-    $groupParam                      = New-Object system.Windows.Forms.Groupbox
-    $groupParam.height               = 200
-    $groupParam.width                = 400
-    $groupParam.BackColor            = "#575555"
-    $groupParam.Anchor               = 'top,right,bottom'
-    $groupParam.text                 = "Parameters"
-    $groupParam.location             = New-Object System.Drawing.Point(15,320)
+$DescribeText                    = New-Object system.Windows.Forms.TextBox
+$DescribeText.multiline          = $true
+$DescribeText.enabled            = $true
+$DescribeText.ReadOnly           = $true
+$DescribeText.width              = 256
+$DescribeText.height             = 382
+$DescribeText.anchor             = 'top,left,bottom,right'
+$DescribeText.location           = New-Object System.Drawing.Point(20,184)
+$DescribeText.Font               = 'Microsoft Sans Serif,10'
+$DescribeText.Scrollbars         = "Vertical" 
 
-    $labelName                       = New-Object system.Windows.Forms.Label
-    $labelName.text                  = "Name :"
-    $labelName.AutoSize              = $true
-    $labelName.width                 = 25
-    $labelName.height                = 10
-    $labelName.location              = New-Object System.Drawing.Point(20,21)
-    $labelName.Font                  = 'Microsoft Sans Serif,10'
+$ListDistrib                     = New-Object system.Windows.Forms.ListView
+$ListDistrib.text                = "listView"
+$ListDistrib.BackColor           = "#575555"
+$ListDistrib.anchor              = 'top,right,left'
+$ListDistrib.width               = 400
+$ListDistrib.height              = 300
+$ListDistrib.location            = New-Object System.Drawing.Point(15,10)
+$ListDistrib.View                = "Details"
 
-    $textboxName                     = New-Object system.Windows.Forms.TextBox
-    $textboxName.multiline           = $false
-    $textboxName.width               = 100
-    $textboxName.height              = 20
-    $textboxName.location            = New-Object System.Drawing.Point(91,18)
-    $textboxName.Font                = 'Microsoft Sans Serif,10'
+$groupParam                      = New-Object system.Windows.Forms.Groupbox
+$groupParam.height               = 200
+$groupParam.width                = 400
+$groupParam.BackColor            = "#575555"
+$groupParam.Anchor               = 'top,right,bottom'
+$groupParam.text                 = "Parameters"
+$groupParam.location             = New-Object System.Drawing.Point(15,320)
 
-    $labelVersion                    = New-Object system.Windows.Forms.Label
-    $labelVersion.text               = "Version :"
-    $labelVersion.AutoSize           = $true
-    $labelVersion.width              = 25
-    $labelVersion.height             = 10
-    $labelVersion.location           = New-Object System.Drawing.Point(200,21)
-    $labelVersion.Font               = 'Microsoft Sans Serif,10'
+$labelName                       = New-Object system.Windows.Forms.Label
+$labelName.text                  = "Name :"
+$labelName.AutoSize              = $true
+$labelName.width                 = 25
+$labelName.height                = 10
+$labelName.location              = New-Object System.Drawing.Point(20,21)
+$labelName.Font                  = 'Microsoft Sans Serif,10'
 
-    $comboboxVersion                 = New-Object system.Windows.Forms.ComboBox
-    $comboboxVersion.width           = 100
-    $comboboxVersion.height          = 20
-    $comboboxVersion.location        = New-Object System.Drawing.Point(270,18)
-    $comboboxVersion.Font            = 'Microsoft Sans Serif,10'
+$textboxName                     = New-Object system.Windows.Forms.TextBox
+$textboxName.multiline           = $false
+$textboxName.width               = 100
+$textboxName.height              = 20
+$textboxName.location            = New-Object System.Drawing.Point(91,18)
+$textboxName.Font                = 'Microsoft Sans Serif,10'
 
-    $labelUsername                   = New-Object system.Windows.Forms.Label
-    $labelUsername.text              = "Username :"
-    $labelUsername.AutoSize          = $true
-    $labelUsername.width             = 25
-    $labelUsername.height            = 10
-    $labelUsername.location          = New-Object System.Drawing.Point(20,71)
-    $labelUsername.Font              = 'Microsoft Sans Serif,10'
+$labelVersion                    = New-Object system.Windows.Forms.Label
+$labelVersion.text               = "Version :"
+$labelVersion.AutoSize           = $true
+$labelVersion.width              = 25
+$labelVersion.height             = 10
+$labelVersion.location           = New-Object System.Drawing.Point(200,21)
+$labelVersion.Font               = 'Microsoft Sans Serif,10'
 
-    $textboxUsername                 = New-Object system.Windows.Forms.TextBox
-    $textboxUsername.multiline       = $false
-    $textboxUsername.width           = 100
-    $textboxUsername.height          = 20
-    $textboxUsername.location        = New-Object System.Drawing.Point(150,68)
-    $textboxUsername.Font            = 'Microsoft Sans Serif,10'
+$comboboxVersion                 = New-Object system.Windows.Forms.ComboBox
+$comboboxVersion.width           = 100
+$comboboxVersion.height          = 20
+$comboboxVersion.location        = New-Object System.Drawing.Point(270,18)
+$comboboxVersion.Font            = 'Microsoft Sans Serif,10'
 
-    $labelPassword                   = New-Object system.Windows.Forms.Label
-    $labelPassword.text              = "Password :"
-    $labelPassword.AutoSize          = $true
-    $labelPassword.width             = 25
-    $labelPassword.height            = 10
-    $labelPassword.location          = New-Object System.Drawing.Point(20,111)
-    $labelPassword.Font              = 'Microsoft Sans Serif,10'
+$labelUsername                   = New-Object system.Windows.Forms.Label
+$labelUsername.text              = "Username :"
+$labelUsername.AutoSize          = $true
+$labelUsername.width             = 25
+$labelUsername.height            = 10
+$labelUsername.location          = New-Object System.Drawing.Point(20,71)
+$labelUsername.Font              = 'Microsoft Sans Serif,10'
 
-    $textboxPassword                 = New-Object system.Windows.Forms.TextBox
-    $textboxPassword.multiline       = $false
-    $textboxPassword.width           = 100
-    $textboxPassword.height          = 20
-    $textboxPassword.location        = New-Object System.Drawing.Point(150,108)
-    $textboxPassword.Font            = 'Microsoft Sans Serif,10'
-    $textboxPassword.PasswordChar    = '*'
+$textboxUsername                 = New-Object system.Windows.Forms.TextBox
+$textboxUsername.multiline       = $false
+$textboxUsername.width           = 100
+$textboxUsername.height          = 20
+$textboxUsername.location        = New-Object System.Drawing.Point(150,68)
+$textboxUsername.Font            = 'Microsoft Sans Serif,10'
 
-    $labelPasswordRetype             = New-Object system.Windows.Forms.Label
-    $labelPasswordRetype.text        = "Retype Password :"
-    $labelPasswordRetype.AutoSize    = $true
-    $labelPasswordRetype.width       = 25
-    $labelPasswordRetype.height      = 10
-    $labelPasswordRetype.location    = New-Object System.Drawing.Point(20,151)
-    $labelPasswordRetype.Font        = 'Microsoft Sans Serif,10'
+$labelPassword                   = New-Object system.Windows.Forms.Label
+$labelPassword.text              = "Password :"
+$labelPassword.AutoSize          = $true
+$labelPassword.width             = 25
+$labelPassword.height            = 10
+$labelPassword.location          = New-Object System.Drawing.Point(20,111)
+$labelPassword.Font              = 'Microsoft Sans Serif,10'
 
-    $textboxPasswordRetype           = New-Object system.Windows.Forms.TextBox
-    $textboxPasswordRetype.multiline  = $false
-    $textboxPasswordRetype.width     = 100
-    $textboxPasswordRetype.height    = 20
-    $textboxPasswordRetype.location  = New-Object System.Drawing.Point(150,148)
-    $textboxPasswordRetype.Font      = 'Microsoft Sans Serif,10'
-    $textboxPasswordRetype.PasswordChar = '*'
+$textboxPassword                 = New-Object system.Windows.Forms.TextBox
+$textboxPassword.multiline       = $false
+$textboxPassword.width           = 100
+$textboxPassword.height          = 20
+$textboxPassword.location        = New-Object System.Drawing.Point(150,108)
+$textboxPassword.Font            = 'Microsoft Sans Serif,10'
+$textboxPassword.PasswordChar    = '*'
 
-    $button_InstallSrc               = New-Object system.Windows.Forms.Button
-    $button_InstallSrc.text          = "Install"
-    $button_InstallSrc.width         = 90
-    $button_InstallSrc.height        = 30
-    $button_InstallSrc.anchor        = 'bottom,left'
-    $button_InstallSrc.location      = New-Object System.Drawing.Point(15,550)
-    $button_InstallSrc.Font          = 'Microsoft Sans Serif,10'
+$labelPasswordRetype             = New-Object system.Windows.Forms.Label
+$labelPasswordRetype.text        = "Retype Password :"
+$labelPasswordRetype.AutoSize    = $true
+$labelPasswordRetype.width       = 25
+$labelPasswordRetype.height      = 10
+$labelPasswordRetype.location    = New-Object System.Drawing.Point(20,151)
+$labelPasswordRetype.Font        = 'Microsoft Sans Serif,10'
 
-    $InstallFromSrc_form.controls.AddRange(@($groupDescription,$ListDistrib,$button_InstallSrc, $groupParam))
-    $groupDescription.controls.AddRange(@($IconDistribution,$DescribeText))
-    $groupParam.controls.AddRange(@($labelName,$textboxName,$labelVersion,$comboboxVersion,$labelUsername,$textboxUsername,$labelPassword,$textboxPassword,$labelPasswordRetype,$textboxPasswordRetype))
+$textboxPasswordRetype           = New-Object system.Windows.Forms.TextBox
+$textboxPasswordRetype.multiline  = $false
+$textboxPasswordRetype.width     = 100
+$textboxPasswordRetype.height    = 20
+$textboxPasswordRetype.location  = New-Object System.Drawing.Point(150,148)
+$textboxPasswordRetype.Font      = 'Microsoft Sans Serif,10'
+$textboxPasswordRetype.PasswordChar = '*'
+
+$button_InstallSrc               = New-Object system.Windows.Forms.Button
+$button_InstallSrc.text          = "Install"
+$button_InstallSrc.width         = 90
+$button_InstallSrc.height        = 30
+$button_InstallSrc.anchor        = 'bottom,left'
+$button_InstallSrc.location      = New-Object System.Drawing.Point(15,550)
+$button_InstallSrc.Font          = 'Microsoft Sans Serif,10'
+
+$InstallFromSrc_form.controls.AddRange(@($groupDescription,$ListDistrib,$button_InstallSrc, $groupParam))
+$groupDescription.controls.AddRange(@($IconDistribution,$DescribeText))
+$groupParam.controls.AddRange(@($labelName,$textboxName,$labelVersion,$comboboxVersion,$labelUsername,$textboxUsername,$labelPassword,$textboxPassword,$labelPasswordRetype,$textboxPasswordRetype))
     
     
     
-    $InstallFromSrc_form.Add_Shown({
-        $ListDistrib.Items.clear()
+$InstallFromSrc_form.Add_Shown({
+    $ListDistrib.Items.clear()
 
-        $ListDistrib.Columns.Add("Distribution")
+    $ListDistrib.Columns.Add("Distribution")
     
-        foreach($distribution in Get-ChildItem -Path distribution | % {$_.BaseName}) {
-            $ListDistrib.Items.Add($distribution)
-            $ListDistrib.AutoResizeColumns(2)
-        }
+    foreach($distribution in Get-ChildItem -Path distribution | % {$_.BaseName}) {
+        $ListDistrib.Items.Add($distribution)
+        $ListDistrib.AutoResizeColumns(2)
+    }
     
-    })
-    $ListDistrib.Add_Click({
-        $IconDistribution.imageLocation = ""
-        $DescribeText.Clear()
-        $comboboxVersion.items.Clear()
-        $comboboxVersion.Text = ""
+})
+$ListDistrib.Add_Click({
+    $IconDistribution.imageLocation = ""
+    $DescribeText.Clear()
+    $comboboxVersion.items.Clear()
+    $comboboxVersion.Text = ""
+    $distribution = $ListDistrib.SelectedItems.text
+    . "distribution\$distribution.ps1"
+
+    foreach($version in $versions) {
+        $comboboxVersion.items.Add($version)
+    }
+
+    $IconDistribution.imageLocation = "$scriptDir\$logo"
+    $DescribeText.Text = $summary
+    $comboboxVersion.SelectedIndex = 0
+})
+
+$consoleForm.Add_Shown({
+    #$consoleForm.Activate()
+    $name = $textboxName.Text
+    $version = $comboboxVersion.SelectedItem
+    $location = $Parameters.parameters.WSL.Location
+    $username = $textboxUsername.Text
+    $password = $textboxPassword.Text
+    $passwordRetype = $textboxPasswordRetype.Text
+
+    $buttonDone.Enabled = $False
+    $textboxConsole.Clear()
+    setup $name $version $username $password $location | foreach {
+        $textboxConsole.AppendText("$_`r`n")
+    }
+    $buttonDone.Enabled = $True
+                
+})
+
+$button_InstallSrc.Add_Click({
+    $name = $textboxName.Text
+    $version = $comboboxVersion.SelectedItem
+    $location = $Parameters.parameters.WSL.Location
+    $username = $textboxUsername.Text
+    $password = $textboxPassword.Text
+    $passwordRetype = $textboxPasswordRetype.Text
+
+    if ($password -eq $passwordRetype) {
         $distribution = $ListDistrib.SelectedItems.text
         . "distribution\$distribution.ps1"
 
-        foreach($version in $versions) {
-            $comboboxVersion.items.Add($version)
-        }
-
-        $IconDistribution.imageLocation = "$scriptDir\$logo"
-        $DescribeText.Text = $summary
-        $comboboxVersion.SelectedIndex = 0
-    })
-
-    $button_InstallSrc.Add_Click({
-        $name = $textboxName.Text
-        $version = $comboboxVersion.SelectedItem
-        $location = $Parameters.parameters.WSL.Location
-        $username = $textboxUsername.Text
-        $password = $textboxPassword.Text
-        $passwordRetype = $textboxPasswordRetype.Text
-
-        if ($password -eq $passwordRetype) {
-            $distribution = $ListDistrib.SelectedItems.text
-            . "distribution\$distribution.ps1"
-
-            $consoleForm.Add_Shown({
-                #$consoleForm.Activate()
-                $buttonDone.Enabled = $False
-                $textboxConsole.Clear()
-                setup $name $version $username $password $location | foreach {
-                    $textboxConsole.AppendText("$_`r`n")
-                }
-                $buttonDone.Enabled = $True
-                
-            })
             
-            $consoleForm.ShowDialog()
+            
+        $consoleForm.ShowDialog()
             
             
 
-            if (Get-Variable versions) {
-                Remove-Variable versions
-            }
-            if (Get-Item -Path Function:setup) {
-                Remove-Item -Path Function:setup
-            }
-        } else {
-            error_form "Password doesn't match"
+        if (Get-Variable versions) {
+            Remove-Variable versions
         }
-    })
-
-    $InstallFromSrc_form.Add_Closed({
-        $List_WSL.Clear()
-        $List_WSL.Columns.Add("Name")
-        $List_WSL.Columns.Add("Status")
-        $List_WSL.Columns.Add("WSL Version")
-    
-
-        $ListDistri = (wsl --list --verbose) | select -Skip 1 | foreach {
-            if ($_.Length -ne 1) {
-                $distriName = ""
-                [int[]][char[]]$_ | foreach {
-                    if ( $_ -ne 0 ) {
-                        $distriName += [char]$_
-                    }
-                }
-                $distriName
-            } 
-        } | ConvertFrom-String
-
-        foreach ($distri in $ListDistri) {
-            $itemname = New-Object System.Windows.Forms.ListViewItem($distri.p2)
-            $itemname.SubItems.Add($distri.p3)
-            $itemname.SubItems.Add($distri.p4)
-            $List_WSL.Items.Add($itemname)
-            $List_WSL.AutoResizeColumns(2)
+        if (Get-Item -Path Function:setup) {
+            Remove-Item -Path Function:setup
         }
-    })
+    } else {
+        error_form "Password doesn't match"
+    }
+})
+
+$InstallFromSrc_form.Add_Closed({
+    refresh_List $List_WSL
+})
    
-    $InstallFromSrc_form.ShowDialog()
+   
 
-}
 
 $List_WSL.Add_DoubleClick({ 
     $Distri = $List_WSL.SelectedItems.Text
-    write-host "Click $Distri" 
+    $ProcessDistro = Start-Process -FilePath wsl.exe -ArgumentList "-d $Distri" -PassThru
+
+    
+    Start-Sleep -s 2
+    refresh_List $List_WSL
+    $ProcessDistro.Add_Exited({
+        refresh_List $List_WSL
+    })
+    write-host "Click $Distri"
 })
 
 $main_form.Add_Shown({ 
@@ -543,7 +574,7 @@ $main_form.Add_Shown({
 
 
 $submenuInstallSrc.Add_Click({
-    InstallFromSrc_form
+    $InstallFromSrc_form.ShowDialog()
 })
 
 
@@ -565,6 +596,5 @@ $buttonDone.Add_Click({
     $consoleForm.Close()
 })
 
-#Write your logic code here
-
+Hide_Powershell_Console
 [void]$main_form.ShowDialog()
