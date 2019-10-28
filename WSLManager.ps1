@@ -24,7 +24,6 @@ if (!(Test-Path $ParametersFile)) {
 }
 
 
-
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -38,6 +37,58 @@ function Hide_Powershell_Console {
     '
     $consolePtr = [Console.Window]::GetConsoleWindow()
     [Console.Window]::ShowWindow($consolePtr, 0)
+}
+
+function Check_If_WSL {
+    if (!(Get-Command -Name wsl -ErrorAction Ignore)) {
+        error_form "WSL isn't installed"
+    }
+}
+
+function InstallFromDocker($name, $image) {
+    $location = $Parameters.parameters.WSL.Location
+
+    write-host "Downloading docker image"
+    docker pull $image
+    write-host "Creating temp docker container"
+    docker container create --name TmpWSL $image
+    write-host "Creating tarball"
+    docker container export -o $env:TMP\$name.tar.gz TmpWSL
+    write-host "Creating WSL Distribution"
+    wsl --import $name $location $env:TMP\$name.tar.gz
+    write-host "Cleaning"
+    docker container rm -f TmpWSL
+    Remove-Item $env:TMP\$name.tar.gz
+
+
+}
+
+function refresh_List($List_WSL) {
+    $List_WSL.Clear()
+    $List_WSL.Columns.Add("Name")
+    $List_WSL.Columns.Add("Status")
+    $List_WSL.Columns.Add("WSL Version")
+    
+
+    $ListDistri = (wsl --list --verbose) | select -Skip 1 | foreach {
+        if ($_.Length -ne 1) {
+            $distriName = ""
+            [int[]][char[]]$_ | foreach {
+                if ( $_ -ne 0 ) {
+                    $distriName += [char]$_
+                }
+            }
+            $distriName
+        } 
+    } | ConvertFrom-String
+
+    foreach ($distri in $ListDistri) {
+        $itemname = New-Object System.Windows.Forms.ListViewItem($distri.p2)
+        $itemname.SubItems.Add($distri.p3)
+        $itemname.SubItems.Add($distri.p4)
+        $List_WSL.Items.Add($itemname)
+        $List_WSL.AutoResizeColumns(2)
+    }
 }
 
 function error_form($error) {
@@ -60,8 +111,10 @@ function error_form($error) {
     $errorForm.ShowDialog()
 }
 
-function about_form() {
-    $licence = @"
+
+
+## About FORM
+$licence = @"
 MIT License
 
 Copyright (c) 2019 xataz
@@ -94,7 +147,7 @@ $aboutForm.text                  = "WSL Manager - About"
 
 $textboxLicence                  = New-Object system.Windows.Forms.TextBox
 $textboxLicence.multiline        = $true
-$textboxLicence.ReadOnly        = $true
+$textboxLicence.ReadOnly         = $true
 $textboxLicence.width            = 360
 $textboxLicence.height           = 304
 $textboxLicence.location         = New-Object System.Drawing.Point(20,81)
@@ -112,11 +165,6 @@ $labelTitle.Font                 = 'Microsoft Sans Serif,20'
 
 $aboutForm.controls.AddRange(@($textboxLicence,$labelTitle))
 
-$aboutForm.ShowDialog()
-
-}
-
-
 
 ## Main FORM
 $main_form                       = New-Object system.Windows.Forms.Form
@@ -130,18 +178,34 @@ $List_WSL.text                   = "List_WSL"
 $List_WSL.width                  = 325
 $List_WSL.height                 = 250
 $List_WSL.Margin                 = 0
-$List_WSL.Anchor                 = 'top,right,bottom,left'
+$List_WSL.Anchor                 = 'top, bottom,left'
 $List_WSL.BackColor              = "#575555"
 $List_WSL.location               = New-Object System.Drawing.Point(0,25)
 $List_WSL.View                   = "Details"
 
-$groupDistri                     = New-Object system.Windows.Forms.Groupbox
-$groupDistri.height              = 200
-$groupDistri.width               = 400
-$groupDistri.BackColor           = "#575555"
-$groupDistri.Anchor              = 'top,right,bottom'
-$groupDistri.text                = "Parameters"
-$groupDistri.location            = New-Object System.Drawing.Point(15,320)
+$InfoGroup                       = New-Object system.Windows.Forms.Groupbox
+$InfoGroup.text                  = "Information"
+$InfoGroup.height                = 250
+$InfoGroup.width                 = 385
+$InfoGroup.Anchor                = 'top,right,bottom'
+$InfoGroup.location              = New-Object System.Drawing.Point(330,25)
+$InfoGroup.BackColor             = "#575555"
+
+$buttonStart                      = New-Object system.Windows.Forms.Button
+$buttonStart.text                 = "Start"
+$buttonStart.width                = 60
+$buttonStart.height               = 30
+$buttonStart.location             = New-Object System.Drawing.Point(666,359)
+$buttonStart.Font                 = 'Microsoft Sans Serif,10'
+$buttonStart.Enabled              = $False
+
+$buttonDelete                      = New-Object system.Windows.Forms.Button
+$buttonDelete.text                 = "Delete"
+$buttonDelete.width                = 60
+$buttonDelete.height               = 30
+$buttonDelete.location             = New-Object System.Drawing.Point(666,359)
+$buttonDelete.Font                 = 'Microsoft Sans Serif,10'
+$buttonDelete.Enabled              = $False
 
 $menuMain                        = New-Object System.Windows.Forms.MenuStrip
 $menuMain.Margin                 = 0
@@ -167,10 +231,64 @@ $menuHelp.Text                   = "?"
 $submenuAbout                    = New-Object System.Windows.Forms.ToolStripMenuItem
 $submenuAbout.Text               = "About"
 
-$main_form.controls.AddRange(@($List_WSL,$menuMain))
+$main_form.controls.AddRange(@($List_WSL,$menuMain,$InfoGroup))
 $menuMain.Items.AddRange(@($menuTools,$menuHelp))
 $menuTools.DropDownItems.AddRange(@($submenuInstallSrc,$submenuInstallDocker,$submenuSettings,$submenuExit))
 $menuHelp.DropDownItems.AddRange(@($submenuAbout))
+
+## Console FORM docker
+$consoleFormDocker                     = New-Object system.Windows.Forms.Form
+$consoleFormDocker.ClientSize          = '750,400'
+$consoleFormDocker.text                = "WSL Manager - Console"
+$consoleFormDocker.TopMost             = $false
+$consoleFormDocker.BackColor             = "#575555"
+
+$textboxConsoleDocker                  = New-Object system.Windows.Forms.TextBox
+$textboxConsoleDocker.multiline        = $true
+$textboxConsoleDocker.ReadOnly         = $true
+$textboxConsoleDocker.Scrollbars       = 'Vertical'
+$textboxConsoleDocker.width            = 725
+$textboxConsoleDocker.height           = 330
+$textboxConsoleDocker.Anchor           = 'top,right,bottom,left'
+$textboxConsoleDocker.location         = New-Object System.Drawing.Point(12,15)
+$textboxConsoleDocker.Font             = 'Microsoft Sans Serif,10'
+
+$buttonDoneDocker                      = New-Object system.Windows.Forms.Button
+$buttonDoneDocker.text                 = "Done"
+$buttonDoneDocker.width                = 60
+$buttonDoneDocker.height               = 30
+$buttonDoneDocker.location             = New-Object System.Drawing.Point(666,359)
+$buttonDoneDocker.Font                 = 'Microsoft Sans Serif,10'
+$buttonDoneDocker.Enabled              = $False
+
+$consoleFormDocker.controls.AddRange(@($textboxConsoleDocker,$buttonDoneDocker))
+
+## Console FORM src
+$consoleFormSrc                     = New-Object system.Windows.Forms.Form
+$consoleFormSrc.ClientSize          = '750,400'
+$consoleFormSrc.text                = "WSL Manager - Console"
+$consoleFormSrc.TopMost             = $false
+$consoleFormSrc.BackColor             = "#575555"
+
+$textboxConsoleSrc                  = New-Object system.Windows.Forms.TextBox
+$textboxConsoleSrc.multiline        = $true
+$textboxConsoleSrc.ReadOnly         = $true
+$textboxConsoleSrc.Scrollbars       = 'Vertical'
+$textboxConsoleSrc.width            = 725
+$textboxConsoleSrc.height           = 330
+$textboxConsoleSrc.Anchor           = 'top,right,bottom,left'
+$textboxConsoleSrc.location         = New-Object System.Drawing.Point(12,15)
+$textboxConsoleSrc.Font             = 'Microsoft Sans Serif,10'
+
+$buttonDoneSrc                      = New-Object system.Windows.Forms.Button
+$buttonDoneSrc.text                 = "Done"
+$buttonDoneSrc.width                = 60
+$buttonDoneSrc.height               = 30
+$buttonDoneSrc.location             = New-Object System.Drawing.Point(666,359)
+$buttonDoneSrc.Font                 = 'Microsoft Sans Serif,10'
+$buttonDoneSrc.Enabled              = $False
+
+$consoleFormSrc.controls.AddRange(@($textboxConsoleSrc,$buttonDoneSrc))
 
 ## Console FORM
 $consoleForm                     = New-Object system.Windows.Forms.Form
@@ -199,115 +317,109 @@ $buttonDone.Enabled              = $False
 
 $consoleForm.controls.AddRange(@($textboxConsole,$buttonDone))
 
-function refresh_List($List_WSL) {
-    $List_WSL.Clear()
-    $List_WSL.Columns.Add("Name")
-    $List_WSL.Columns.Add("Status")
-    $List_WSL.Columns.Add("WSL Version")
-    
 
-    $ListDistri = (wsl --list --verbose) | select -Skip 1 | foreach {
-        if ($_.Length -ne 1) {
-            $distriName = ""
-            [int[]][char[]]$_ | foreach {
-                if ( $_ -ne 0 ) {
-                    $distriName += [char]$_
-                }
-            }
-            $distriName
-        } 
-    } | ConvertFrom-String
+## Settings FORM
+$settingsForm                    = New-Object system.Windows.Forms.Form
+$settingsForm.ClientSize         = '400,400'
+$settingsForm.text               = "WSL Manager - Settings"
+$settingsForm.TopMost            = $false
+$settingsForm.BackColor          = "#575555"
 
-    foreach ($distri in $ListDistri) {
-        $itemname = New-Object System.Windows.Forms.ListViewItem($distri.p2)
-        $itemname.SubItems.Add($distri.p3)
-        $itemname.SubItems.Add($distri.p4)
-        $List_WSL.Items.Add($itemname)
-        $List_WSL.AutoResizeColumns(2)
-    }
-}
+$labelPathWSL                    = New-Object system.Windows.Forms.Label
+$labelPathWSL.text               = "WSL Path :"
+$labelPathWSL.AutoSize           = $true
+$labelPathWSL.width              = 25
+$labelPathWSL.height             = 10
+$labelPathWSL.location           = New-Object System.Drawing.Point(22,29)
+$labelPathWSL.Font               = 'Microsoft Sans Serif,10'
 
-function settings_form() {
-    $settingsForm                    = New-Object system.Windows.Forms.Form
-    $settingsForm.ClientSize         = '400,400'
-    $settingsForm.text               = "WSL Manager - Settings"
-    $settingsForm.TopMost            = $false
-    $settingsForm.BackColor          = "#575555"
+$labelWSLVersion                 = New-Object system.Windows.Forms.Label
+$labelWSLVersion.text            = "WSL Version :"
+$labelWSLVersion.AutoSize        = $true
+$labelWSLVersion.width           = 25
+$labelWSLVersion.height          = 10
+$labelWSLVersion.location        = New-Object System.Drawing.Point(22,69)
+$labelWSLVersion.Font            = 'Microsoft Sans Serif,10'
 
-    $labelPathWSL                    = New-Object system.Windows.Forms.Label
-    $labelPathWSL.text               = "WSL Path :"
-    $labelPathWSL.AutoSize           = $true
-    $labelPathWSL.width              = 25
-    $labelPathWSL.height             = 10
-    $labelPathWSL.location           = New-Object System.Drawing.Point(22,29)
-    $labelPathWSL.Font               = 'Microsoft Sans Serif,10'
+$buttonCancel                    = New-Object system.Windows.Forms.Button
+$buttonCancel.text               = "Cancel"
+$buttonCancel.width              = 60
+$buttonCancel.height             = 30
+$buttonCancel.location           = New-Object System.Drawing.Point(322,358)
+$buttonCancel.Font               = 'Microsoft Sans Serif,10'
 
-    $labelWSLVersion                 = New-Object system.Windows.Forms.Label
-    $labelWSLVersion.text            = "WSL Version :"
-    $labelWSLVersion.AutoSize        = $true
-    $labelWSLVersion.width           = 25
-    $labelWSLVersion.height          = 10
-    $labelWSLVersion.location        = New-Object System.Drawing.Point(22,69)
-    $labelWSLVersion.Font            = 'Microsoft Sans Serif,10'
+$buttonSave                      = New-Object system.Windows.Forms.Button
+$buttonSave.text                 = "Save"
+$buttonSave.width                = 60
+$buttonSave.height               = 30
+$buttonSave.location             = New-Object System.Drawing.Point(245,358)
+$buttonSave.Font                 = 'Microsoft Sans Serif,10'
 
-    $buttonCancel                    = New-Object system.Windows.Forms.Button
-    $buttonCancel.text               = "Cancel"
-    $buttonCancel.width              = 60
-    $buttonCancel.height             = 30
-    $buttonCancel.location           = New-Object System.Drawing.Point(322,358)
-    $buttonCancel.Font               = 'Microsoft Sans Serif,10'
+$textboxPathWSL                  = New-Object system.Windows.Forms.TextBox
+$textboxPathWSL.multiline        = $false
+$textboxPathWSL.width            = 100
+$textboxPathWSL.height           = 20
+$textboxPathWSL.location         = New-Object System.Drawing.Point(120,26)
+$textboxPathWSL.Font             = 'Microsoft Sans Serif,10'
+$textboxPathWSL.Text             = $Parameters.parameters.WSL.Location
 
-    $buttonSave                      = New-Object system.Windows.Forms.Button
-    $buttonSave.text                 = "Save"
-    $buttonSave.width                = 60
-    $buttonSave.height               = 30
-    $buttonSave.location             = New-Object System.Drawing.Point(245,358)
-    $buttonSave.Font                 = 'Microsoft Sans Serif,10'
+$comboboxWSLVersion              = New-Object system.Windows.Forms.ComboBox
+$comboboxWSLVersion.width        = 100
+$comboboxWSLVersion.height       = 20
+$comboboxWSLVersion.location     = New-Object System.Drawing.Point(120,67)
+$comboboxWSLVersion.Font         = 'Microsoft Sans Serif,10'
 
-    $textboxPathWSL                  = New-Object system.Windows.Forms.TextBox
-    $textboxPathWSL.multiline        = $false
-    $textboxPathWSL.width            = 100
-    $textboxPathWSL.height           = 20
-    $textboxPathWSL.location         = New-Object System.Drawing.Point(120,26)
-    $textboxPathWSL.Font             = 'Microsoft Sans Serif,10'
-    $textboxPathWSL.Text             = $Parameters.parameters.WSL.Location
+$settingsForm.controls.AddRange(@($labelPathWSL,$labelWSLVersion,$buttonCancel,$buttonSave,$textboxPathWSL,$comboboxWSLVersion))
 
-    $comboboxWSLVersion              = New-Object system.Windows.Forms.ComboBox
-    $comboboxWSLVersion.width        = 100
-    $comboboxWSLVersion.height       = 20
-    $comboboxWSLVersion.location     = New-Object System.Drawing.Point(120,67)
-    $comboboxWSLVersion.Font         = 'Microsoft Sans Serif,10'
+## InstallFromDocker FORM
+$InstallFromDocker_form             = New-Object system.Windows.Forms.Form
+$InstallFromDocker_form.ClientSize  = '200,200'
+$InstallFromDocker_form.text        = "WSL Manager - Install From Sources"
+$InstallFromDocker_form.BackColor   = "#575555"
+$InstallFromDocker_form.TopMost     = $false
 
-    $settingsForm.controls.AddRange(@($labelPathWSL,$labelWSLVersion,$buttonCancel,$buttonSave,$textboxPathWSL,$comboboxWSLVersion))
+$labelNameDocker                    = New-Object system.Windows.Forms.Label
+$labelNameDocker.text               = "Name :"
+$labelNameDocker.AutoSize           = $true
+$labelNameDocker.width              = 25
+$labelNameDocker.height             = 10
+$labelNameDocker.location           = New-Object System.Drawing.Point(20,21)
+$labelNameDocker.Font               = 'Microsoft Sans Serif,10'
 
-    if ( [int](Get-WmiObject Win32_OperatingSystem).BuildNumber -le 18917) {
-        $comboboxWSLVersion.items.Add("1")
-    } else {
-        $comboboxWSLVersion.items.AddRange(@("1","2"))
-    }
-    
-    if ($Parameters.parameters.WSL.DefaultVersion -eq "1") {
-        $comboboxWSLVersion.SelectedIndex = 0
-    } elseif ($Parameters.parameters.WSL.DefaultVersion -eq "2") {
-        $comboboxWSLVersion.SelectedIndex = 1
-    }
+$textboxNameDocker                  = New-Object system.Windows.Forms.TextBox
+$textboxNameDocker.multiline        = $false
+$textboxNameDocker.width            = 100
+$textboxNameDocker.height           = 20
+$textboxNameDocker.location         = New-Object System.Drawing.Point(91,18)
+$textboxNameDocker.Font             = 'Microsoft Sans Serif,10'
 
-    $buttonCancel.Add_Click({
-        $settingsForm.Close()
-    })
+$labelImageDocker                    = New-Object system.Windows.Forms.Label
+$labelImageDocker.text               = "Image :"
+$labelImageDocker.AutoSize           = $true
+$labelImageDocker.width              = 25
+$labelImageDocker.height             = 10
+$labelImageDocker.location           = New-Object System.Drawing.Point(20,61)
+$labelImageDocker.Font               = 'Microsoft Sans Serif,10'
 
-    $buttonSave.Add_Click({
-        $Parameters.parameters.WSL.DefaultVersion = $comboboxWSLVersion.SelectedItem
-        $Parameters.parameters.WSL.Location = $textboxPathWSL.Text
-        $Parameters.Save($ParametersFile)
-        $settingsForm.Close()
-    })
+$textboxImageDocker                  = New-Object system.Windows.Forms.TextBox
+$textboxImageDocker.multiline        = $false
+$textboxImageDocker.width            = 100
+$textboxImageDocker.height           = 20
+$textboxImageDocker.location         = New-Object System.Drawing.Point(91,58)
+$textboxImageDocker.Font             = 'Microsoft Sans Serif,10'
 
-    $settingsForm.ShowDialog()
-}
+$button_InstallDocker               = New-Object system.Windows.Forms.Button
+$button_InstallDocker.text          = "Install"
+$button_InstallDocker.width         = 90
+$button_InstallDocker.height        = 30
+$button_InstallDocker.anchor        = 'bottom,left'
+$button_InstallDocker.location      = New-Object System.Drawing.Point(15,101)
+$button_InstallDocker.Font          = 'Microsoft Sans Serif,10'
+
+$InstallFromDocker_form.controls.AddRange(@($labelNameDocker, $textboxNameDocker, $labelImageDocker, $textboxImageDocker, $button_InstallDocker))
 
 
-
+## InstallFromSrc FORM
 $InstallFromSrc_form             = New-Object system.Windows.Forms.Form
 $InstallFromSrc_form.ClientSize  = '725,600'
 $InstallFromSrc_form.text        = "WSL Manager - Install From Sources"
@@ -475,7 +587,7 @@ $ListDistrib.Add_Click({
     $comboboxVersion.SelectedIndex = 0
 })
 
-$consoleForm.Add_Shown({
+$consoleFormSrc.Add_Shown({
     #$consoleForm.Activate()
     $name = $textboxName.Text
     $version = $comboboxVersion.SelectedItem
@@ -484,13 +596,27 @@ $consoleForm.Add_Shown({
     $password = $textboxPassword.Text
     $passwordRetype = $textboxPasswordRetype.Text
 
-    $buttonDone.Enabled = $False
-    $textboxConsole.Clear()
+    $buttonDoneSrc.Enabled = $False
+    $textboxConsoleSrc.Clear()
     setup $name $version $username $password $location | foreach {
-        $textboxConsole.AppendText("$_`r`n")
+        $textboxConsoleSrc.AppendText("$_`r`n")
     }
-    $buttonDone.Enabled = $True
+    $buttonDoneSrc.Enabled = $True
                 
+})
+
+$consoleFormDocker.Add_Shown({
+    #$consoleForm.Activate()
+    $name = $textboxNameDocker.Text
+    $image = $textboxImageDocker.Text
+
+    $buttonDoneDocker.Enabled = $False
+    $textboxConsoleDocker.Clear()
+        InstallFromDocker $name $image | foreach {
+            $textboxConsoleDocker.AppendText("$_`r`n")
+        }
+
+    $buttonDoneDocker.Enabled = $True
 })
 
 $button_InstallSrc.Add_Click({
@@ -503,13 +629,9 @@ $button_InstallSrc.Add_Click({
 
     if ($password -eq $passwordRetype) {
         $distribution = $ListDistrib.SelectedItems.text
-        . "distribution\$distribution.ps1"
-
+        . "distribution\$distribution.ps1"          
             
-            
-        $consoleForm.ShowDialog()
-            
-            
+        $consoleFormSrc.ShowDialog()
 
         if (Get-Variable versions) {
             Remove-Variable versions
@@ -525,21 +647,59 @@ $button_InstallSrc.Add_Click({
 $InstallFromSrc_form.Add_Closed({
     refresh_List $List_WSL
 })
+
+$InstallFromDocker_form.Add_Closed({
+    refresh_List $List_WSL
+})
    
-   
+$settingsForm.Add_Shown({
+    if ( [int](Get-WmiObject Win32_OperatingSystem).BuildNumber -le 18917) {
+        $comboboxWSLVersion.items.Add("1")
+    } else {
+        $comboboxWSLVersion.items.AddRange(@("1","2"))
+    }
+    
+    if ($Parameters.parameters.WSL.DefaultVersion -eq "1") {
+        $comboboxWSLVersion.SelectedIndex = 0
+    } elseif ($Parameters.parameters.WSL.DefaultVersion -eq "2") {
+        $comboboxWSLVersion.SelectedIndex = 1
+    }
+})
+
+$buttonCancel.Add_Click({
+    $settingsForm.Close()
+})
+
+$buttonSave.Add_Click({
+    $Parameters.parameters.WSL.DefaultVersion = $comboboxWSLVersion.SelectedItem
+    $Parameters.parameters.WSL.Location = $textboxPathWSL.Text
+    $Parameters.Save($ParametersFile)
+    $settingsForm.Close()
+})   
 
 
 $List_WSL.Add_DoubleClick({ 
     $Distri = $List_WSL.SelectedItems.Text
     $ProcessDistro = Start-Process -FilePath wsl.exe -ArgumentList "-d $Distri" -PassThru
 
+    $EventProcess = Register-ObjectEvent -InputEvent $ProcessDistro -EventName exited -Action {
+        refresh_List $List_WSL
+        Unregister-Event -SubscriptionId $EventProcess.ID
+    }
     
     Start-Sleep -s 2
     refresh_List $List_WSL
     $ProcessDistro.Add_Exited({
         refresh_List $List_WSL
     })
-    write-host "Click $Distri"
+})
+
+$List_WSL.Add_Click({
+    $name = $List_WSL.SelectedItems.Text
+    $size = (wsl.exe -d $name du -hsx /).split()[0]
+    $distributionName = (wsl.exe -d $name grep PRETTY_NAME /etc/os-release).split("=")[1] -replace '"',''
+    $usersList = (wsl -d $name awk -F ":" '{if ($3 >= 1000 && $3 <= 60000) { print $1 }}' /etc/passwd)
+
 })
 
 $main_form.Add_Shown({ 
@@ -570,6 +730,13 @@ $main_form.Add_Shown({
 
 })
 
+$button_InstallDocker.Add_Click({
+    $name = $textboxNameDocker.Text
+    $image = $textboxImageDocker.Text
+
+    $consoleFormDocker.ShowDialog()
+            
+})
 
 
 
@@ -577,6 +744,13 @@ $submenuInstallSrc.Add_Click({
     $InstallFromSrc_form.ShowDialog()
 })
 
+$submenuInstallDocker.Add_Click({
+    if (Get-Command -Name docker -ErrorAction Ignore) {
+        $InstallFromDocker_form.ShowDialog()
+    } else {
+        error_form "Docker isn't installed"
+    }
+})
 
 
 $submenuExit.Add_Click({
@@ -584,17 +758,23 @@ $submenuExit.Add_Click({
 })
 
 $submenuSettings.Add_Click({
-    settings_form
+    $settingsForm.ShowDialog()
 })
 
 $submenuAbout.Add_Click({
-    about_form
+    $aboutForm.ShowDialog()
 })
 
-$buttonDone.Add_Click({
-    $textboxConsole.Clear()
-    $consoleForm.Close()
+$buttonDoneDocker.Add_Click({
+    $textboxConsoleDocker.Clear()
+    $consoleFormDocker.Close()
+})
+
+$buttonDoneSrc.Add_Click({
+    $textboxConsoleSrc.Clear()
+    $consoleFormSrc.Close()
 })
 
 Hide_Powershell_Console
+Check_If_WSL
 [void]$main_form.ShowDialog()
